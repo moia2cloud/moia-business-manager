@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Building2, CreditCard } from 'lucide-react';
+import { Save, Building2, CreditCard, Download } from 'lucide-react';
 import useStore from '../store/useStore';
 
 const Settings = () => {
@@ -15,6 +15,20 @@ const Settings = () => {
     e.preventDefault();
     updateCompanySettings(settings);
     alert('تم حفظ الإعدادات بنجاح');
+  };
+
+  const handleBackup = () => {
+    const data = localStorage.getItem('moia-business-storage');
+    if (!data) return alert('لا يوجد بيانات لنسخها احتياطياً');
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `moia_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -76,8 +90,11 @@ const Settings = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button type="submit" className="btn btn-primary" style={{ padding: '1rem 3rem', fontSize: '1.1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button type="button" className="btn btn-secondary" style={{ padding: '1rem 2rem', fontSize: '1.1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }} onClick={handleBackup}>
+            <Download size={20} /> تنزيل نسخة احتياطية
+          </button>
+          <button type="submit" className="btn btn-primary" style={{ padding: '1rem 3rem', fontSize: '1.1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <Save size={20} /> حفظ الإعدادات
           </button>
         </div>

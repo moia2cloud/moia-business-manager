@@ -385,7 +385,7 @@ const ClientProfile = () => {
                 )}
               </div>
               
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: 'var(--bg-input)', padding: '0.25rem', borderRadius: '8px' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: 'var(--bg-input)', padding: '0.25rem', borderRadius: '8px', flexWrap: 'wrap' }}>
                 <button 
                   onClick={() => setSortBy('campaign')} 
                   style={{ padding: '0.5rem 1rem', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer', backgroundColor: sortBy === 'campaign' ? 'var(--primary)' : 'transparent', color: sortBy === 'campaign' ? 'white' : 'var(--text-muted)' }}
@@ -397,6 +397,12 @@ const ClientProfile = () => {
                   style={{ padding: '0.5rem 1rem', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer', backgroundColor: sortBy === 'date' ? 'var(--primary)' : 'transparent', color: sortBy === 'date' ? 'white' : 'var(--text-muted)' }}
                 >
                   ترتيب بالزمن (Chronological)
+                </button>
+                <button 
+                  onClick={() => setSortBy('payment')} 
+                  style={{ padding: '0.5rem 1rem', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer', backgroundColor: sortBy === 'payment' ? 'var(--primary)' : 'transparent', color: sortBy === 'payment' ? 'white' : 'var(--text-muted)' }}
+                >
+                  فرز حسب حالة الدفع
                 </button>
               </div>
             </div>
@@ -685,9 +691,21 @@ const ClientProfile = () => {
                     );
                   })
                 ) : (
-                  // FLAT CHRONOLOGICAL VIEW (Colored Rows)
+                  // FLAT CHRONOLOGICAL OR PAYMENT VIEW (Colored Rows)
                   <tbody>
-                    {Object.values(groupedProjects).flat().sort((a,b) => new Date(a.deadline||'2099') - new Date(b.deadline||'2099')).map(p => {
+                    {Object.values(groupedProjects).flat().sort((a,b) => {
+                      if (sortBy === 'payment') {
+                        const statusA = getProjectPaymentStatus(a.id);
+                        const statusB = getProjectPaymentStatus(b.id);
+                        const scoreA = statusA.isPaid ? 3 : (statusA.invoiceId ? 2 : 1);
+                        const scoreB = statusB.isPaid ? 3 : (statusB.invoiceId ? 2 : 1);
+                        if (scoreA !== scoreB) return scoreA - scoreB;
+                        // fallback to chronological
+                        return new Date(a.deadline||'2099') - new Date(b.deadline||'2099');
+                      }
+                      // Default Chronological
+                      return new Date(a.deadline||'2099') - new Date(b.deadline||'2099');
+                    }).map(p => {
                       const rowColor = getProjectColor(p);
                       const pStatus = getProjectPaymentStatus(p.id);
                       const isBilled = pStatus.invoiceId !== null;

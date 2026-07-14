@@ -279,6 +279,7 @@ input:focus, select:focus, textarea:focus {
 /* ==========================================================================
    Print Styles Reset
    ========================================================================== */
+.print-only { display: none; }
 @page { margin: 0; }
 @media print {
   html, body, #root, #root > div, #root > div > div, .main-area-container, .main-content-padding {
