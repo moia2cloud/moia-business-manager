@@ -117,6 +117,31 @@ const AdmZip = require('adm-zip');
 
 const upload = multer({ dest: os.tmpdir() });
 
+const backupSystem = () => {
+  const root = path.resolve(__dirname, '..');
+  const backupDir = path.join(root, 'rollback_backup');
+  
+  if (fs.existsSync(backupDir)) {
+    fs.rmSync(backupDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(backupDir);
+  
+  // Backup dist
+  if (fs.existsSync(path.join(root, 'dist'))) {
+    fs.cpSync(path.join(root, 'dist'), path.join(backupDir, 'dist'), { recursive: true });
+  }
+  
+  // Backup server (excluding node_modules)
+  fs.mkdirSync(path.join(backupDir, 'server'));
+  const serverFiles = fs.readdirSync(__dirname);
+  for (const file of serverFiles) {
+    if (file !== 'node_modules' && file !== '.env') { // Don't backup/overwrite env in rollback generally, but it's safe if it doesn't exist
+      fs.cpSync(path.join(__dirname, file), path.join(backupDir, 'server', file), { recursive: true });
+    }
+  }
+  console.log('System backup created before update.');
+};
+
 app.post('/api/update', authenticateToken, upload.single('updateFile'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'لم يتم رفع أي ملف' });
@@ -124,9 +149,12 @@ app.post('/api/update', authenticateToken, upload.single('updateFile'), (req, re
 
   try {
     const zip = new AdmZip(req.file.path);
-    // Extract to the project root directory (one level up from server/)
     const extractTo = path.resolve(__dirname, '..');
     
+    // 1. Create a rollback backup first
+    backupSystem();
+
+    // 2. Extract update
     console.log('Applying OTA update to:', extractTo);
     zip.extractAllTo(extractTo, true); // true = overwrite
     
@@ -147,6 +175,51 @@ app.post('/api/update', authenticateToken, upload.single('updateFile'), (req, re
       fs.unlinkSync(req.file.path);
     }
     res.status(500).json({ error: 'فشل في تطبيق التحديث: ' + err.message });
+  }
+});
+
+// Check Rollback Status
+app.get('/api/check-rollback', authenticateToken, (req, res) => {
+  const root = path.resolve(__dirname, '..');
+  const backupDir = path.join(root, 'rollback_backup');
+  res.json({ hasRollback: fs.existsSync(backupDir) });
+});
+
+// OTA Rollback Route
+app.post('/api/rollback', authenticateToken, (req, res) => {
+  try {
+    const root = path.resolve(__dirname, '..');
+    const backupDir = path.join(root, 'rollback_backup');
+    
+    if (!fs.existsSync(backupDir)) {
+      return res.status(400).json({ error: 'لا يوجد نسخة احتياطية سابقة للنظام للرجوع إليها' });
+    }
+    
+    console.log('Rolling back system to previous version...');
+    
+    // Restore dist
+    if (fs.existsSync(path.join(backupDir, 'dist'))) {
+      fs.cpSync(path.join(backupDir, 'dist'), path.join(root, 'dist'), { recursive: true, force: true });
+    }
+    
+    // Restore server
+    if (fs.existsSync(path.join(backupDir, 'server'))) {
+      const serverFiles = fs.readdirSync(path.join(backupDir, 'server'));
+      for (const file of serverFiles) {
+        fs.cpSync(path.join(backupDir, 'server', file), path.join(__dirname, file), { recursive: true, force: true });
+      }
+    }
+    
+    res.json({ success: true, message: 'تم استرجاع النظام السابق بنجاح، جاري إعادة تشغيل السيرفر...' });
+    
+    setTimeout(() => {
+      console.log('Rollback applied successfully. Exiting process...');
+      process.exit(0);
+    }, 2000);
+    
+  } catch (err) {
+    console.error('Rollback failed:', err);
+    res.status(500).json({ error: 'فشل في استرجاع النظام: ' + err.message });
   }
 });
 

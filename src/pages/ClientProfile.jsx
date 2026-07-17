@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, Briefcase, Receipt, CreditCard, Plus, ListPlus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { ArrowRight, Briefcase, Receipt, CreditCard, Plus, ListPlus, Trash2, Edit2, Check, X , Link as LinkIcon } from 'lucide-react';
 import useStore from '../store/useStore';
 import { useState } from 'react';
 
@@ -36,7 +36,7 @@ const ClientProfile = () => {
   };
   
   // Fast Entry State
-  const [fastEntry, setFastEntry] = useState({ title: '', campaign: '', date: '', budget: '', notes: '', color: '#3B82F6' });
+  const [fastEntry, setFastEntry] = useState({ title: '', campaign: '', date: '', budget: '', notes: '', link: '', color: '#3B82F6' });
   const [addingToCampaign, setAddingToCampaign] = useState(null);
   
   // Filters
@@ -113,6 +113,7 @@ const ClientProfile = () => {
         deadline: fastEntry.date,
         budget: fastEntry.budget === '' ? '' : Number(fastEntry.budget),
         description: fastEntry.notes,
+        link: fastEntry.link,
         color: finalColor
       });
       setEditingProjectId(null);
@@ -124,6 +125,7 @@ const ClientProfile = () => {
         deadline: fastEntry.date,
         budget: fastEntry.budget === '' ? '' : Number(fastEntry.budget),
         description: fastEntry.notes,
+        link: fastEntry.link,
         color: finalColor,
         status: 'Pending',
         progress: 0
@@ -131,7 +133,7 @@ const ClientProfile = () => {
     }
     
     // Keep campaign, date and color, clear title, budget, and notes for rapid sequential entry
-    setFastEntry({ ...fastEntry, title: '', budget: '', notes: '' });
+    setFastEntry({ ...fastEntry, title: '', budget: '', notes: '', link: '' });
     
     // Only scroll to bottom if NOT inline adding
     if (!addingToCampaign) {
@@ -361,7 +363,7 @@ const ClientProfile = () => {
                     <button className="btn btn-success" onClick={handleFastAdd} style={{ padding: '0.5rem 1rem' }} title="حفظ التعديل">
                       <Check size={20} />
                     </button>
-                    <button className="btn btn-danger" onClick={() => { setEditingProjectId(null); setFastEntry({ ...fastEntry, title: '', budget: '', notes: '' }); }} style={{ padding: '0.5rem 1rem' }} title="إلغاء التعديل">
+                    <button className="btn btn-danger" onClick={() => { setEditingProjectId(null); setFastEntry({ ...fastEntry, title: '', budget: '', notes: '', link: '' }); }} style={{ padding: '0.5rem 1rem' }} title="إلغاء التعديل">
                       <X size={20} />
                     </button>
                   </>
@@ -555,6 +557,7 @@ const ClientProfile = () => {
                             <td style={{ padding: '0.75rem 1rem' }}></td>
                             <td style={{ padding: '0.75rem 1rem' }}>
                               <input type="text" value={fastEntry.title} onChange={e => setFastEntry({...fastEntry, title: e.target.value})} onKeyDown={handleKeyDown} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', color: 'black', fontWeight: 600 }} placeholder="اسم المهمة (واضغط Enter)" autoFocus />
+                              <input type="text" value={fastEntry.link} onChange={e => setFastEntry({...fastEntry, link: e.target.value})} onKeyDown={handleKeyDown} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', marginTop: '0.5rem', color: 'black' }} placeholder="رابط خارجي (اختياري)" />
                             </td>
                             <td style={{ padding: '0.75rem 1rem' }}>
                               <input type="date" value={fastEntry.date} onChange={e => setFastEntry({...fastEntry, date: e.target.value})} onKeyDown={handleKeyDown} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', color: 'black' }} />
@@ -570,7 +573,7 @@ const ClientProfile = () => {
                             </td>
                             <td style={{ padding: '0.75rem 1rem', display: 'flex', gap: '0.5rem' }}>
                               <button onClick={handleFastAdd} className="btn btn-success" style={{ padding: '0.3rem 0.5rem' }} title="حفظ"><Check size={16} /></button>
-                              <button onClick={() => { setAddingToCampaign(null); setFastEntry({ ...fastEntry, title: '', budget: '', notes: '' }); }} className="btn btn-danger" style={{ padding: '0.3rem 0.5rem' }} title="إلغاء"><X size={16} /></button>
+                              <button onClick={() => { setAddingToCampaign(null); setFastEntry({ ...fastEntry, title: '', budget: '', notes: '', link: '' }); }} className="btn btn-danger" style={{ padding: '0.3rem 0.5rem' }} title="إلغاء"><X size={16} /></button>
                             </td>
                           </tr>
                         )}
@@ -584,6 +587,7 @@ const ClientProfile = () => {
                                 <td style={{ padding: '0.75rem 1rem' }}></td>
                                 <td style={{ padding: '0.75rem 1rem' }}>
                                   <input type="text" value={fastEntry.title} onChange={e => setFastEntry({...fastEntry, title: e.target.value})} style={{ width: '100%', padding: '0.3rem', borderRadius: '4px', border: '1px solid var(--border-color)', marginBottom: '0.2rem', color: 'black' }} placeholder="المهمة" autoFocus />
+                                  <input type="text" value={fastEntry.link} onChange={e => setFastEntry({...fastEntry, link: e.target.value})} style={{ width: '100%', padding: '0.3rem', borderRadius: '4px', border: '1px solid var(--border-color)', marginBottom: '0.2rem', color: 'black' }} placeholder="رابط خارجي (اختياري)" />
                                   <input type="text" value={fastEntry.campaign} onChange={e => setFastEntry({...fastEntry, campaign: e.target.value})} style={{ width: '100%', padding: '0.3rem', borderRadius: '4px', border: '1px solid var(--border-color)', fontSize: '0.85rem', color: 'black' }} placeholder="الحدث" />
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem' }}>
@@ -601,7 +605,7 @@ const ClientProfile = () => {
                                 <td style={{ padding: '0.75rem 1rem' }}></td>
                                 <td style={{ padding: '0.75rem 1rem', display: 'flex', gap: '0.5rem' }}>
                                   <button onClick={handleFastAdd} className="btn btn-success" style={{ padding: '0.3rem 0.5rem' }} title="حفظ"><Check size={16} /></button>
-                                  <button onClick={() => { setEditingProjectId(null); setFastEntry({ title: '', campaign: '', date: '', budget: '', notes: '', color: '#3B82F6' }); }} className="btn btn-danger" style={{ padding: '0.3rem 0.5rem' }} title="إلغاء"><X size={16} /></button>
+                                  <button onClick={() => { setEditingProjectId(null); setFastEntry({ title: '', campaign: '', date: '', budget: '', notes: '', link: '', color: '#3B82F6' }); }} className="btn btn-danger" style={{ padding: '0.3rem 0.5rem' }} title="إلغاء"><X size={16} /></button>
                                 </td>
                               </tr>
                             );
@@ -618,7 +622,15 @@ const ClientProfile = () => {
                                   style={{ transform: 'scale(1.2)', cursor: isBilled ? 'not-allowed' : 'pointer' }}
                                 />
                               </td>
-                              <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{p.title}</td>
+                              <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>
+  <div style={{ display: 'flex', alignItems: 'center' }}>
+    <div style={{ display: 'flex', alignItems: 'center' }}>
+  <span>{p.title}</span>
+  {p.link && <a href={p.link.startsWith('http') ? p.link : `https://${p.link}`} target="_blank" rel="noreferrer" style={{ marginLeft: '0.5rem', color: 'var(--primary)', display: 'flex' }} title="فتح الرابط"><LinkIcon size={14} /></a>}
+</div>
+    {p.link && <a href={p.link.startsWith('http') ? p.link : `https://${p.link}`} target="_blank" rel="noreferrer" style={{ marginLeft: '0.5rem', color: 'var(--primary)', display: 'flex' }} title="فتح الرابط"><LinkIcon size={14} /></a>}
+  </div>
+</td>
                               <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{p.deadline || '-'}</td>
                             <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{p.description || '-'}</td>
                             <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: p.budget === '' || p.budget == null ? 'var(--warning)' : 'inherit' }}>
@@ -715,6 +727,7 @@ const ClientProfile = () => {
                             <td style={{ padding: '0.75rem 1rem' }}></td>
                             <td style={{ padding: '0.75rem 1rem' }}>
                               <input type="text" value={fastEntry.title} onChange={e => setFastEntry({...fastEntry, title: e.target.value})} style={{ width: '100%', padding: '0.3rem', borderRadius: '4px', border: '1px solid var(--border-color)', marginBottom: '0.2rem', color: 'black' }} placeholder="المهمة" autoFocus />
+                                  <input type="text" value={fastEntry.link} onChange={e => setFastEntry({...fastEntry, link: e.target.value})} style={{ width: '100%', padding: '0.3rem', borderRadius: '4px', border: '1px solid var(--border-color)', marginBottom: '0.2rem', color: 'black' }} placeholder="رابط خارجي (اختياري)" />
                               <input type="text" value={fastEntry.campaign} onChange={e => setFastEntry({...fastEntry, campaign: e.target.value})} style={{ width: '100%', padding: '0.3rem', borderRadius: '4px', border: '1px solid var(--border-color)', fontSize: '0.85rem', color: 'black' }} placeholder="الحدث" />
                             </td>
                             <td style={{ padding: '0.75rem 1rem' }}>
@@ -732,7 +745,7 @@ const ClientProfile = () => {
                             <td style={{ padding: '0.75rem 1rem' }}></td>
                             <td style={{ padding: '0.75rem 1rem', display: 'flex', gap: '0.5rem' }}>
                               <button onClick={handleFastAdd} className="btn btn-success" style={{ padding: '0.3rem 0.5rem' }} title="حفظ"><Check size={16} /></button>
-                              <button onClick={() => { setEditingProjectId(null); setFastEntry({ title: '', campaign: '', date: '', budget: '', notes: '', color: '#3B82F6' }); }} className="btn btn-danger" style={{ padding: '0.3rem 0.5rem' }} title="إلغاء"><X size={16} /></button>
+                              <button onClick={() => { setEditingProjectId(null); setFastEntry({ title: '', campaign: '', date: '', budget: '', notes: '', link: '', color: '#3B82F6' }); }} className="btn btn-danger" style={{ padding: '0.3rem 0.5rem' }} title="إلغاء"><X size={16} /></button>
                             </td>
                           </tr>
                         );
@@ -751,7 +764,10 @@ const ClientProfile = () => {
                           </td>
                           <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                <span>{p.title}</span>
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+  <span>{p.title}</span>
+  {p.link && <a href={p.link.startsWith('http') ? p.link : `https://${p.link}`} target="_blank" rel="noreferrer" style={{ marginLeft: '0.5rem', color: 'var(--primary)', display: 'flex' }} title="فتح الرابط"><LinkIcon size={14} /></a>}
+</div>
                                 <select 
                                   value={p.campaign || 'عام'}
                                   onChange={(e) => {

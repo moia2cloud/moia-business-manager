@@ -1,16 +1,48 @@
 import { useState, useEffect, useRef } from 'react';
-import { Save, Building2, CreditCard, Download, UploadCloud } from 'lucide-react';
+import { Save, Building2, CreditCard, Download, UploadCloud, RotateCcw, Upload, AlertTriangle } from 'lucide-react';
 import useStore from '../store/useStore';
+import ConfirmSliderModal from '../components/ConfirmSliderModal';
 
 const Settings = () => {
   const { companySettings, updateCompanySettings } = useStore();
   const [settings, setSettings] = useState(companySettings);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [hasDataRollback, setHasDataRollback] = useState(false);
+  const [hasSystemRollback, setHasSystemRollback] = useState(false);
   const fileInputRef = useRef(null);
+  const restoreDataInputRef = useRef(null);
+  
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {}
+  });
 
   // Sync state if store updates externally
   useEffect(() => {
     setSettings(companySettings);
+    // Check if there is a data rollback available
+    if (localStorage.getItem('moia-business-rollback')) {
+      setHasDataRollback(true);
+    }
+    
+    // Check if there is a system rollback available
+    const checkSystemRollback = async () => {
+      try {
+        const token = localStorage.getItem('moia_token');
+        const res = await fetch('http://localhost:3001/api/check-rollback', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setHasSystemRollback(data.hasRollback);
+        }
+      } catch (err) {
+        console.error('Failed to check rollback status', err);
+      }
+    };
+    checkSystemRollback();
   }, [companySettings]);
 
   const handleSave = (e) => {
@@ -33,32 +65,80 @@ const Settings = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleUpdate = async (e) => {
+  const executeRestoreData = (file) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const jsonData = event.target.result;
+        JSON.parse(jsonData); // validate json
+        
+        // Take rollback snapshot
+        const currentData = localStorage.getItem('moia-business-storage');
+        if (currentData) {
+          localStorage.setItem('moia-business-rollback', currentData);
+          setHasDataRollback(true);
+        }
+
+        // Apply new data
+        localStorage.setItem('moia-business-storage', jsonData);
+        alert('تمت استعادة البيانات بنجاح! سيتم تحديث الصفحة.');
+        window.location.reload();
+      } catch (err) {
+        alert('الملف المرفوع تالف أو غير صالح.');
+      }
+    };
+    reader.readAsText(file);
+    if (restoreDataInputRef.current) restoreDataInputRef.current.value = '';
+  };
+
+  const handleRestoreData = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
-    if (!file.name.endsWith('.zip')) {
-      alert('الرجاء اختيار ملف zip يحتوي على التحديثات');
+
+    if (!file.name.endsWith('.json')) {
+      alert('الرجاء اختيار ملف .json صالح');
       return;
     }
 
-    const confirmUpdate = window.confirm('هل أنت متأكد من رغبتك في تثبيت هذا التحديث؟ قد يتوقف النظام لعدة ثواني أثناء العملية.');
-    if (!confirmUpdate) {
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
+    setModalConfig({
+      isOpen: true,
+      title: 'استعادة البيانات',
+      description: 'هذه العملية ستستبدل بياناتك الحالية بالبيانات المرفوعة. لا تقلق، سيتم حفظ نسخة احتياطية فورية قبل الاستبدال.',
+      onConfirm: () => executeRestoreData(file),
+      onCancel: () => { if (restoreDataInputRef.current) restoreDataInputRef.current.value = ''; }
+    });
+  };
 
+  const executeUndoRestore = () => {
+    const rollbackData = localStorage.getItem('moia-business-rollback');
+    if (rollbackData) {
+      localStorage.setItem('moia-business-storage', rollbackData);
+      localStorage.removeItem('moia-business-rollback');
+      alert('تم التراجع عن الاستعادة بنجاح. سيتم تحديث الصفحة.');
+      window.location.reload();
+    }
+  };
+
+  const handleUndoRestore = () => {
+    setModalConfig({
+      isOpen: true,
+      title: 'التراجع عن الاستعادة',
+      description: 'هل أنت متأكد من رغبتك في التراجع واستعادة بياناتك السابقة؟',
+      onConfirm: executeUndoRestore,
+      onCancel: () => {}
+    });
+  };
+
+  const executeUpdate = async (file) => {
     setIsUpdating(true);
     const formData = new FormData();
     formData.append('updateFile', file);
 
     try {
       const token = localStorage.getItem('moia_token');
-      const response = await fetch('http://localhost:3001/api/update', { // Note: using relative path in production
+      const response = await fetch('http://localhost:3001/api/update', { 
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
 
@@ -66,9 +146,7 @@ const Settings = () => {
       
       if (response.ok) {
         alert('تم رفع وتثبيت التحديث بنجاح! سيتم إعادة تحميل الصفحة الآن.');
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000); // Give server 3 seconds to restart
+        setTimeout(() => { window.location.reload(); }, 3000); 
       } else {
         alert('حدث خطأ أثناء التحديث: ' + result.error);
         setIsUpdating(false);
@@ -80,6 +158,58 @@ const Settings = () => {
     }
     
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleUpdate = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith('.zip')) {
+      alert('الرجاء اختيار ملف zip يحتوي على التحديثات');
+      return;
+    }
+
+    setModalConfig({
+      isOpen: true,
+      title: 'تثبيت التحديث',
+      description: 'أنت على وشك تثبيت تحديث جديد للنظام. سيقوم النظام بإنشاء نقطة استعادة تلقائية قبل التحديث تحسباً لأي طارئ. قد يتوقف النظام لثوانٍ معدودة.',
+      onConfirm: () => executeUpdate(file),
+      onCancel: () => { if (fileInputRef.current) fileInputRef.current.value = ''; }
+    });
+  };
+
+  const executeSystemRollback = async () => {
+    setIsUpdating(true);
+    try {
+      const token = localStorage.getItem('moia_token');
+      const response = await fetch('http://localhost:3001/api/rollback', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+
+      if (response.ok) {
+        alert('تم استرجاع النظام السابق بنجاح! سيتم إعادة تحميل الصفحة...');
+        setTimeout(() => { window.location.reload(); }, 3000);
+      } else {
+        alert('خطأ: ' + result.error);
+        setIsUpdating(false);
+      }
+    } catch (err) {
+      console.error('Rollback error:', err);
+      alert('فشل الاتصال بالسيرفر أثناء الاسترجاع.');
+      setIsUpdating(false);
+    }
+  };
+
+  const handleSystemRollback = () => {
+    setModalConfig({
+      isOpen: true,
+      title: 'تنبيه خطير: استرجاع النظام',
+      description: 'هذه العملية ستعيد النظام بأكمله إلى آخر نسخة سابقة (Rollback) وتمسح التحديث الأخير. تأكد من أنك تريد القيام بذلك.',
+      onConfirm: executeSystemRollback,
+      onCancel: () => {}
+    });
   };
 
   return (
@@ -141,17 +271,53 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* System Update */}
+        {/* Data & Backup */}
+        <div className="card" style={{ border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--primary)' }}>
+            <Save size={24} />
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>إدارة البيانات</h2>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary" style={{ padding: '0.75rem 1.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }} onClick={handleBackup}>
+              <Download size={20} /> تنزيل نسخة احتياطية
+            </button>
+            
+            <input 
+              type="file" 
+              accept=".json" 
+              ref={restoreDataInputRef}
+              onChange={handleRestoreData}
+              style={{ display: 'none' }} 
+              id="restore-upload"
+            />
+            <label 
+              htmlFor="restore-upload" 
+              className="btn btn-primary"
+              style={{ padding: '0.75rem 1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <Upload size={20} /> رفع نسخة احتياطية (استعادة)
+            </label>
+
+            {hasDataRollback && (
+              <button type="button" onClick={handleUndoRestore} style={{ padding: '0.75rem 1.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                <RotateCcw size={20} /> تراجع عن آخر استعادة
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* System Update & Rollback */}
         <div className="card" style={{ border: '1px solid var(--border)', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--primary)' }}>
             <UploadCloud size={24} />
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>تحديث النظام (OTA Update)</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>تحديث النظام وحمايته (OTA)</h2>
           </div>
           <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
-            يمكنك رفع ملف التحديث بصيغة <strong style={{color: 'var(--text)'}}>.zip</strong> هنا. سيقوم السيرفر بفك الضغط وتحديث نفسه تلقائياً دون الحاجة للتدخل اليدوي.
+            يمكنك رفع ملف التحديث هنا. سيتم حفظ نسخة احتياطية من النظام القديم تلقائياً قبل التحديث.
           </p>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <input 
               type="file" 
               accept=".zip" 
@@ -166,21 +332,39 @@ const Settings = () => {
               style={{ padding: '0.75rem 1.5rem', cursor: isUpdating ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px dashed var(--primary)' }}
             >
               <UploadCloud size={20} />
-              {isUpdating ? 'جاري رفع وتثبيت التحديث...' : 'اختر ملف التحديث (.zip)'}
+              {isUpdating ? 'جاري التنفيذ...' : 'اختر التحديث (.zip)'}
             </label>
+
+            {hasSystemRollback && (
+              <button type="button" onClick={handleSystemRollback} disabled={isUpdating} style={{ padding: '0.75rem 1.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: 'transparent', color: '#ef4444', border: '1px solid #ef4444', borderRadius: '8px', cursor: isUpdating ? 'wait' : 'pointer' }}>
+                <AlertTriangle size={20} /> التراجع عن آخر تحديث (System Rollback)
+              </button>
+            )}
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button type="button" className="btn btn-secondary" style={{ padding: '1rem 2rem', fontSize: '1.1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }} onClick={handleBackup}>
-            <Download size={20} /> تنزيل نسخة احتياطية
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
           <button type="submit" className="btn btn-primary" style={{ padding: '1rem 3rem', fontSize: '1.1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <Save size={20} /> حفظ الإعدادات
+            <Save size={20} /> حفظ الإعدادات الأساسية
           </button>
         </div>
 
       </form>
+      
+      <ConfirmSliderModal 
+        isOpen={modalConfig.isOpen}
+        title={modalConfig.title}
+        description={modalConfig.description}
+        sliderText={modalConfig.sliderText || "اسحب للتأكيد"}
+        onConfirm={() => {
+          modalConfig.onConfirm();
+          setModalConfig(prev => ({ ...prev, isOpen: false }));
+        }}
+        onClose={() => {
+          if (modalConfig.onCancel) modalConfig.onCancel();
+          setModalConfig(prev => ({ ...prev, isOpen: false }));
+        }}
+      />
     </div>
   );
 };
